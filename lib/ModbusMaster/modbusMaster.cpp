@@ -163,3 +163,14 @@ int modbusMaster::decodeRTUFrame(const uint8_t *frame, WORD flen, uint8_t *data,
 
     return 0;
 }
+
+void modbusMaster::begin(int baud, int den)
+{
+    DEN_ = den;
+
+    // Set DEN pin to output
+    pinMode(DEN_, OUTPUT);
+    // Set it to receiving mode (default)
+    digitalWrite(DEN_PIN_, LOW);
+}
+
