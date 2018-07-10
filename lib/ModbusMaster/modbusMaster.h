@@ -58,6 +58,8 @@ class modbusMaster
     private:
     Stream &ser;
     int DEN_;
+    uint8_t recv_buf[MAX_BUF_SIZE];
+    uint8_t send_buf[MAX_BUF_SIZE];
 
     WORD CRC16 (const uint8_t *nData, WORD wLength);
     int encodeRTUFrame(const uint8_t *data, uint8_t dlen, uint8_t *frame, uint8_t slave_addr, uint8_t function_code);

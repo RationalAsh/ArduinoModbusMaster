@@ -174,3 +174,7 @@ void modbusMaster::begin(int baud, int den)
     digitalWrite(DEN_PIN_, LOW);
 }
 
+void modbusMaster::broadcast(uint8_t *data, int dlen)
+{
+    
+}
