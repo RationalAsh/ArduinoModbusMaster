@@ -103,6 +103,130 @@ WORD modbusMaster::CRC16 (const uint8_t *nData, WORD wLength)
 
 #endif
 
+uint16_t modbusMaster::readHR(uint8_t slave_id, uint16_t reg_addr){
+    // int decode = 0;
+    // uint8_t data[MAX_BUF_SIZE];
+    // uint8_t function_code;
+    
+    // decode = decodeRTUFrame(recv_buf, MAX_BUF_SIZE, data, &slave_id, &function_code); 
+    
+}
+
+void modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, int num_regs, uint16_t *arr) {
+
+}
+
+void modbusMaster::writeHR(uint8_t slave_id, uint16_t addr, uint16_t val){
+    static uint8_t data_local[2];
+    data_local[0] = (val >> 8);
+    data_local[1] = val & 0xFF;
+    int output = encodeRTUFrame(data_local, 2, send_buf, slave_id, FUNC_WRITE_REG);
+
+}
+
+int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, const uint16_t *data) {
+    data_buf[0] = start_addr >> 8; 
+    data_buf[1] = start_addr & 0xFF;
+    data_buf[2] = num_regs >> 8;
+    data_buf[3] = num_regs & 0xFF;
+    for(int i = 0; i < num_regs; i++) {
+        data_buf[2*i+4] = data[i] >> 8;
+        data_buf[2*i+5] = data[i] & 0xFF;
+    }  
+    static int8_t state = ST_IDLE;
+    int encode = encodeRTUFrame(data_buf, (num_regs+2)*2, send_buf, slave_id, FUNC_WRITE_MULTIREG);
+    int output = -1;
+
+    if (encode == 0) {
+        int ctr;
+        state = ST_WRIT;
+        for(uint16_t i=0; i<(uint16_t)(num_regs * 2 + 8); i++) {
+            //ser.print(" ");
+            //ser.print(send_buf[i], HEX);
+            //ser.print(" ");
+            ser.write(send_buf[i]);
+            ser.flush();
+        }
+        // ser.write(send_buf, (num_regs*2 + 8));
+        // ser.flush();
+        
+        state = ST_IDLE;
+        // Serial.print("in encode\n");
+
+        delayMicroseconds(100);
+        // Bytes available to read
+        if ( ser.available() > 0 )
+        {
+            state = ST_RECV;
+            ctr = 0;
+            sa_recv = 0;
+            fcode = 0;
+            bytes_read = 0;
+            Serial.print("Received from slave\n");
+        }
+
+        while (state == ST_RECV)
+        {
+            if(ser.available())
+            {
+                recv_buf[ctr++] = ser.read();
+            }
+            else
+            {
+                // Wait for a bit
+                delayMicroseconds(t15);
+                // If serial is still not available
+                if( ser.available() == 0 )
+                {
+                    //Transmission has ended
+                    state = ST_PROC;
+                    bytes_read = ctr;
+                }
+            }
+        }
+
+        if ( state == ST_PROC )
+        {
+            // Process the request in the incoming message.
+            int ret = decodeRTUFrame(recv_buf, bytes_read, recv_buf, &sa_recv, &fcode);
+
+            // If frame decoding was successful
+            if(ret >= 0)
+            {
+                if ( sa_recv != saddr )
+                {
+                    // Ignore the message
+                    state = ST_IDLE;
+                }
+                else
+                {
+                    if(fcode == FUNC_WRITE_MULTIREG ) {
+                            uint16_t start;
+                            uint16_t regs_read;
+                            start = recv_buf[1] | (recv_buf[0] << 8);
+                            regs_read = recv_buf[3] | (recv_buf[2] << 8);
+                            if (start == start_addr && regs_read == num_regs) {
+                                output = 0;
+                            }
+                    }
+                    // Use flush to ensure that all the data is written immediately.
+                    ser.flush();
+                    // Wait for after frame delay
+                    delayMicroseconds(t35);
+                    state = ST_IDLE;
+                }
+            }
+            else
+            {
+                // ser.print("Error decoding frame. Code: ");
+                // ser.println(ret);
+                state = ST_IDLE;
+            }
+        }
+    }
+    return output;
+}
+
 int modbusMaster::encodeRTUFrame(const uint8_t *data, uint8_t dlen, uint8_t *frame, uint8_t slave_addr, uint8_t function_code)
 {
     // Check address for rule violations
@@ -171,7 +295,11 @@ void modbusMaster::begin(int baud, int den)
     // Set DEN pin to output
     pinMode(DEN_, OUTPUT);
     // Set it to receiving mode (default)
-    digitalWrite(DEN_PIN_, LOW);
+    digitalWrite(DEN_, LOW);
+    _baud = baud;
+    byte_time = (1.0e6)/baud;
+    t15 = (unsigned long) (byte_time*2);
+    t35 = (unsigned long) (byte_time*4);
 }
 
 void modbusMaster::broadcast(uint8_t *data, int dlen)
