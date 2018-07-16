@@ -20,14 +20,14 @@ void loop() {
     //Serial1.println(ledState);
     send_output = master.writeMultipleHR(2,10,1,data);
 
-    data[1] ^= 1;
+    data[0] ^= 1;
     // Serial.println(send_output);
-    // if(send_output == 0) {
-    //     Serial.print("Send successful\n");
-    //     send_output = -1;
-    // } else {
-    //     Serial.print("Send no successful\n");
-    // }
+    if(send_output == 0) {
+        Serial.print("Send successful\n");
+        send_output = -1;
+    } else {
+        Serial.print("Send no successful\n");
+    }
     // // Serial1.write("hello world\n");
     digitalWrite(13, ledState);
     ledState ^= 1;

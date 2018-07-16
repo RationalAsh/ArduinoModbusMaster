@@ -129,18 +129,19 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
     data_buf[1] = start_addr & 0xFF;
     data_buf[2] = num_regs >> 8;
     data_buf[3] = num_regs & 0xFF;
+    data_buf[4] = num_regs*2;
     for(int i = 0; i < num_regs; i++) {
-        data_buf[2*i+4] = data[i] >> 8;
-        data_buf[2*i+5] = data[i] & 0xFF;
+        data_buf[2*i+5] = data[i] >> 8;
+        data_buf[2*i+6] = data[i] & 0xFF;
     }  
     static int8_t state = ST_IDLE;
-    int encode = encodeRTUFrame(data_buf, (num_regs+2)*2, send_buf, slave_id, FUNC_WRITE_MULTIREG);
+    int encode = encodeRTUFrame(data_buf, (num_regs+2)*2 +1, send_buf, slave_id, FUNC_WRITE_MULTIREG);
     int output = -1;
 
     if (encode == 0) {
         int ctr;
         state = ST_WRIT;
-        for(uint16_t i=0; i<(uint16_t)(num_regs * 2 + 8); i++) {
+        for(uint16_t i=0; i<(uint16_t)(num_regs * 2 + 9); i++) {
             //ser.print(" ");
             //ser.print(send_buf[i], HEX);
             //ser.print(" ");
@@ -162,7 +163,7 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
             sa_recv = 0;
             fcode = 0;
             bytes_read = 0;
-            Serial.print("Received from slave\n");
+            // Serial.print("Received from slave\n");
         }
 
         while (state == ST_RECV)
@@ -193,7 +194,7 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
             // If frame decoding was successful
             if(ret >= 0)
             {
-                if ( sa_recv != saddr )
+                if ( sa_recv != slave_id )
                 {
                     // Ignore the message
                     state = ST_IDLE;
@@ -218,8 +219,8 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
             }
             else
             {
-                // ser.print("Error decoding frame. Code: ");
-                // ser.println(ret);
+                Serial.print("Error decoding frame. Code: ");
+                Serial.println(ret);
                 state = ST_IDLE;
             }
         }
@@ -304,5 +305,5 @@ void modbusMaster::begin(int baud, int den)
 
 void modbusMaster::broadcast(uint8_t *data, int dlen)
 {
-    
+
 }
