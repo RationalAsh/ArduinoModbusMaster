@@ -2,7 +2,8 @@
 #include "modbusMaster.h"
 
 int send_output = 0;
-uint16_t data[1] = {0x01};
+uint16_t data[1] = {1};
+uint16_t input_data[3] = {0};
 modbusMaster master(Serial1);
 int ledState = 0;
 
@@ -18,12 +19,17 @@ void loop() {
     // put your main code here, to run repeatedly:
     //Serial1.print("Hello World!");
     //Serial1.println(ledState);
-    send_output = master.writeMultipleHR(2,10,1,data);
+    send_output = master.readMultipleHR(2,6,3,input_data);
 
     data[0] ^= 1;
     // Serial.println(send_output);
     if(send_output == 0) {
-        Serial.print("Send successful\n");
+        // Serial.print("Send successful\n");
+        Serial.print(input_data[0], HEX);
+        Serial.print(" ");
+        Serial.print(input_data[1], HEX);
+        Serial.print(" ");
+        Serial.println(input_data[2], HEX);
         send_output = -1;
     } else {
         Serial.print("Send no successful\n");

@@ -103,110 +103,32 @@ WORD modbusMaster::CRC16 (const uint8_t *nData, WORD wLength)
 
 #endif
 
-int modbusMaster::readHR(uint8_t slave_id, uint16_t start_addr, uint16_t *data){
-    uint16_t num_regs = 1;
-    data_buf[0] = start_addr >> 8; 
-    data_buf[1] = start_addr & 0xFF;
-    data_buf[2] = num_regs >> 8;
-    data_buf[3] = num_regs & 0xFF;
-    static int8_t state = ST_IDLE;
-    int encode = encodeRTUFrame(data_buf, 4, send_buf, slave_id, FUNC_READ_MULTIREG);
-    int output = -1;
-
-    if (encode == 0) {
-        int ctr;
-        state = ST_WRIT;
-        for(uint16_t i=0; i<4; i++) {
-            ser.write(send_buf[i]);
-            ser.flush();
-        }
-        state = ST_IDLE;
-
-        delayMicroseconds(100);
-        // Bytes available to read
-        if ( ser.available() > 0 )
-        {
-            state = ST_RECV;
-            ctr = 0;
-            sa_recv = 0;
-            fcode = 0;
-            bytes_read = 0;
-        }
-
-        while (state == ST_RECV)
-        {
-            if(ser.available())
-            {
-                recv_buf[ctr++] = ser.read();
-            }
-            else
-            {
-                // Wait for a bit
-                delayMicroseconds(t15);
-                // If serial is still not available
-                if( ser.available() == 0 )
-                {
-                    //Transmission has ended
-                    state = ST_PROC;
-                    bytes_read = ctr;
-                }
-            }
-        }
-
-        if ( state == ST_PROC )
-        {
-            // Process the request in the incoming message.
-            int ret = decodeRTUFrame(recv_buf, bytes_read, recv_buf, &sa_recv, &fcode);
-
-            // If frame decoding was successful
-            if(ret >= 0)
-            {
-                if ( sa_recv != slave_id )
-                {
-                    // Ignore the message
-                    state = ST_IDLE;
-                }
-                else
-                {
-                    if(fcode == FUNC_READ_MULTIREG ) {
-                            uint16_t byte_count;
-                            byte_count = recv_buf[1] | (recv_buf[0] << 8);
-                            for(int i = 0; i < byte_count/2; i++) {
-                                data[i] = recv_buf[i*2+3] | (recv_buf[i*2+2] << 8);
-                            }
-                            if(byte_count == num_regs * 2);
-                                output = 0;
-                    }
-                    state = ST_IDLE;
-                }
-            }
-            else
-            {
-                Serial.print("Error decoding frame. Code: ");
-                Serial.println(ret);
-                state = ST_IDLE;
-            }
-        }
-    }
-    return output;
-}
-
 int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, uint16_t *data) {
+    const uint16_t slave_id_len = 1;
+    const uint16_t fcode_len = 1;
+    const uint16_t start_addr_len = 2;
+    const uint16_t num_regs_len = 2;
+    const uint16_t crc_len = 2;
+    int ctr;
+
     data_buf[0] = start_addr >> 8; 
     data_buf[1] = start_addr & 0xFF;
     data_buf[2] = num_regs >> 8;
     data_buf[3] = num_regs & 0xFF;
     static int8_t state = ST_IDLE;
-    int encode = encodeRTUFrame(data_buf, 4, send_buf, slave_id, FUNC_READ_INPUT);
+    int encode = encodeRTUFrame(data_buf, start_addr_len+num_regs_len, send_buf, slave_id, FUNC_READ_MULTIREG);
     int output = -1;
 
     if (encode == 0) {
-        int ctr;
         state = ST_WRIT;
-        for(uint16_t i=0; i<4; i++) {
+        uint16_t send_buf_len = slave_id_len + fcode_len + start_addr_len + num_regs_len + crc_len;
+        for(uint16_t i=0; i < send_buf_len; i++) {
             ser.write(send_buf[i]);
             ser.flush();
+            // Serial.print(send_buf[i], HEX);
+            // Serial.print(" ");
         }
+        // Serial.print("\n");
         state = ST_IDLE;
 
         delayMicroseconds(100);
@@ -218,6 +140,8 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
             sa_recv = 0;
             fcode = 0;
             bytes_read = 0;
+        } else {
+            Serial.println("No packet received");
         }
 
         while (state == ST_RECV)
@@ -234,6 +158,11 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
                 if( ser.available() == 0 )
                 {
                     //Transmission has ended
+                    for (int i = 0; i < ctr; i++) {
+                        Serial.print(recv_buf[i], HEX);
+                        Serial.print(" ");
+                    }
+                    Serial.println();
                     state = ST_PROC;
                     bytes_read = ctr;
                 }
@@ -242,12 +171,15 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
 
         if ( state == ST_PROC )
         {
+            Serial.println("in ST_PROC");
             // Process the request in the incoming message.
-            int ret = decodeRTUFrame(recv_buf, bytes_read, recv_buf, &sa_recv, &fcode);
+            int ret = decodeRTUFrame(recv_buf, bytes_read, data_buf, &sa_recv, &fcode);
 
             // If frame decoding was successful
             if(ret >= 0)
             {
+                Serial.print("slave id = ");
+                Serial.println(slave_id);
                 if ( sa_recv != slave_id )
                 {
                     // Ignore the message
@@ -255,107 +187,16 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
                 }
                 else
                 {
-                    if(fcode == FUNC_READ_INPUT) {
+                    Serial.println(fcode, HEX);
+                    if(fcode == FUNC_READ_MULTIREG) {
+                        Serial.print("in fcode\n");
                             uint16_t byte_count;
-                            byte_count = recv_buf[1] | (recv_buf[0] << 8);
+                            byte_count = data_buf[1] | (data_buf[0] << 8);
                             for(int i = 0; i < byte_count/2; i++) {
-                                data[i] = recv_buf[i*2+3] | (recv_buf[i*2+2] << 8);
+                                data[i] = data_buf[i*2+3] | (data_buf[i*2+2] << 8);
                             }
                             if(byte_count == num_regs * 2);
                                 output = 0;
-                    }
-                    state = ST_IDLE;
-                }
-            }
-            else
-            {
-                Serial.print("Error decoding frame. Code: ");
-                Serial.println(ret);
-                state = ST_IDLE;
-            }
-        }
-    }
-    return output;
-}
-
-int modbusMaster::writeHR(uint8_t slave_id, uint16_t start_addr, uint16_t data){
-    uint16_t num_regs = 1;
-    data_buf[0] = start_addr >> 8; 
-    data_buf[1] = start_addr & 0xFF;
-    data_buf[2] = num_regs >> 8;
-    data_buf[3] = num_regs & 0xFF;
-    data_buf[4] = num_regs*2;
-    data_buf[5] = data >> 8;
-    data_buf[6] = data & 0xFF;
-
-    static int8_t state = ST_IDLE;
-    int encode = encodeRTUFrame(data_buf, (num_regs+2)*2 +1, send_buf, slave_id, FUNC_WRITE_REG);
-    int output = -1;
-
-    if (encode == 0) {
-        int ctr;
-        state = ST_WRIT;
-        for(uint16_t i=0; i<(uint16_t)(num_regs * 2 + 9); i++) {
-            ser.write(send_buf[i]);
-            ser.flush();
-        }
-        
-        state = ST_IDLE;
-
-        delayMicroseconds(100);
-        // Bytes available to read
-        if ( ser.available() > 0 )
-        {
-            state = ST_RECV;
-            ctr = 0;
-            sa_recv = 0;
-            fcode = 0;
-            bytes_read = 0;
-        }
-
-        while (state == ST_RECV)
-        {
-            if(ser.available())
-            {
-                recv_buf[ctr++] = ser.read();
-            }
-            else
-            {
-                // Wait for a bit
-                delayMicroseconds(t15);
-                // If serial is still not available
-                if( ser.available() == 0 )
-                {
-                    //Transmission has ended
-                    state = ST_PROC;
-                    bytes_read = ctr;
-                }
-            }
-        }
-
-        if ( state == ST_PROC )
-        {
-            // Process the request in the incoming message.
-            int ret = decodeRTUFrame(recv_buf, bytes_read, recv_buf, &sa_recv, &fcode);
-
-            // If frame decoding was successful
-            if(ret >= 0)
-            {
-                if ( sa_recv != slave_id )
-                {
-                    // Ignore the message
-                    state = ST_IDLE;
-                }
-                else
-                {
-                    if(fcode == FUNC_WRITE_REG ) {
-                            uint16_t start;
-                            uint16_t regs_read;
-                            start = recv_buf[1] | (recv_buf[0] << 8);
-                            regs_read = recv_buf[3] | (recv_buf[2] << 8);
-                            if (start == start_addr && regs_read == num_regs) {
-                                output = 0;
-                            }
                     }
                     state = ST_IDLE;
                 }
@@ -429,7 +270,7 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
         if ( state == ST_PROC )
         {
             // Process the request in the incoming message.
-            int ret = decodeRTUFrame(recv_buf, bytes_read, recv_buf, &sa_recv, &fcode);
+            int ret = decodeRTUFrame(recv_buf, bytes_read, data_buf, &sa_recv, &fcode);
 
             // If frame decoding was successful
             if(ret >= 0)
@@ -444,8 +285,8 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
                     if(fcode == FUNC_WRITE_MULTIREG ) {
                             uint16_t start;
                             uint16_t regs_read;
-                            start = recv_buf[1] | (recv_buf[0] << 8);
-                            regs_read = recv_buf[3] | (recv_buf[2] << 8);
+                            start = data_buf[1] | (data_buf[0] << 8);
+                            regs_read = data_buf[3] | (data_buf[2] << 8);
                             if (start == start_addr && regs_read == num_regs) {
                                 output = 0;
                             }

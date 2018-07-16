@@ -7,7 +7,7 @@
 #include <avr/pgmspace.h>
 #endif
 
-#define MAX_BUF_SIZE 64
+#define MAX_BUF_SIZE 256
 
 #define ST_WRIT  10
 #define ST_IDLE  20
@@ -50,9 +50,9 @@ class modbusMaster
     void begin(int baud, int DEN);
     
     void broadcast(uint8_t *data, int dlen);
-    int readHR(uint8_t slave_id, uint16_t start_addr, uint16_t *data);
+    // int readHR(uint8_t slave_id, uint16_t start_addr, uint16_t *data);
     int readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, uint16_t *data);
-    int writeHR(uint8_t slave_id, uint16_t start_addr, uint16_t data);
+    // int writeHR(uint8_t slave_id, uint16_t start_addr, uint16_t data);
     int writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, const uint16_t *data);
 
     private:
