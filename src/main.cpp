@@ -2,7 +2,7 @@
 #include "modbusMaster.h"
 
 int send_output = 0;
-uint16_t data[1] = {0x123D};
+uint16_t data[1] = {0x01};
 modbusMaster master(Serial1);
 int ledState = 0;
 
@@ -18,7 +18,9 @@ void loop() {
     // put your main code here, to run repeatedly:
     //Serial1.print("Hello World!");
     //Serial1.println(ledState);
-    send_output = master.writeMultipleHR(2,9,1,data); 
+    send_output = master.writeMultipleHR(2,10,1,data);
+
+    data[1] ^= 1;
     // Serial.println(send_output);
     // if(send_output == 0) {
     //     Serial.print("Send successful\n");
@@ -29,5 +31,5 @@ void loop() {
     // // Serial1.write("hello world\n");
     digitalWrite(13, ledState);
     ledState ^= 1;
-    delay(100);
+    delay(500);
 }
