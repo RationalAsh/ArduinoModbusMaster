@@ -50,10 +50,9 @@ class modbusMaster
     void begin(int baud, int DEN);
     
     void broadcast(uint8_t *data, int dlen);
-
-    uint16_t readHR(uint8_t slave_id, uint16_t reg_addr);
-    void readMultipleHR(uint8_t slave_id, uint16_t start_addr, int num_regs, uint16_t *arr);
-    void writeHR(uint8_t slave_id, uint16_t addr, uint16_t val);
+    int readHR(uint8_t slave_id, uint16_t start_addr, uint16_t *data);
+    int readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, uint16_t *data);
+    int writeHR(uint8_t slave_id, uint16_t start_addr, uint16_t data);
     int writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, const uint16_t *data);
 
     private:
@@ -68,7 +67,6 @@ class modbusMaster
     unsigned long t35;
     uint8_t sa_recv;
     uint8_t fcode;
-    uint8_t saddr;
     WORD bytes_read;
 
     WORD CRC16 (const uint8_t *nData, WORD wLength);
