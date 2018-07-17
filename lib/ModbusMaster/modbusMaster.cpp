@@ -125,10 +125,10 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
         for(uint16_t i=0; i < send_buf_len; i++) {
             ser.write(send_buf[i]);
             ser.flush();
-            // Serial.print(send_buf[i], HEX);
-            // Serial.print(" ");
+            Serial.print(send_buf[i], HEX);
+            Serial.print(" ");
         }
-        // Serial.print("\n");
+        Serial.print("\n");
         state = ST_IDLE;
 
         delayMicroseconds(100);
@@ -213,6 +213,12 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
 }
 
 int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t num_regs, const uint16_t *data) {
+    const uint16_t slave_id_len = 1;
+    const uint16_t fcode_len = 1;
+    const uint16_t start_addr_len = 2;
+    const uint16_t byte_count_len = 1;
+    const uint16_t num_regs_len = 2;
+    const uint16_t crc_len = 2;
     data_buf[0] = start_addr >> 8; 
     data_buf[1] = start_addr & 0xFF;
     data_buf[2] = num_regs >> 8;
@@ -223,28 +229,35 @@ int modbusMaster::writeMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_
         data_buf[2*i+6] = data[i] & 0xFF;
     }  
     static int8_t state = ST_IDLE;
-    int encode = encodeRTUFrame(data_buf, (num_regs+2)*2 +1, send_buf, slave_id, FUNC_WRITE_MULTIREG);
+    int encode = encodeRTUFrame(data_buf, start_addr_len + num_regs_len + num_regs*2 + byte_count_len, send_buf, slave_id, FUNC_WRITE_MULTIREG);
     int output = -1;
-
+    uint16_t send_buf_len = slave_id_len + fcode_len + start_addr_len + num_regs_len + num_regs*2 + byte_count_len + crc_len;
     if (encode == 0) {
         int ctr;
         state = ST_WRIT;
-        for(uint16_t i=0; i<(uint16_t)(num_regs * 2 + 9); i++) {
+
+        for(uint16_t i=0; i<(uint16_t)send_buf_len; i++) {
             ser.write(send_buf[i]);
             ser.flush();
+            // Serial.print(send_buf[i], HEX);
+            // Serial.print(" ");
         }
-        
+        // Serial.println("");
+        // Serial.println("encoded\n");
         state = ST_IDLE;
 
         delayMicroseconds(100);
         // Bytes available to read
         if ( ser.available() > 0 )
         {
+            Serial.println("message received\n");
             state = ST_RECV;
             ctr = 0;
             sa_recv = 0;
             fcode = 0;
             bytes_read = 0;
+        } else { 
+            Serial.println("Error");
         }
 
         while (state == ST_RECV)
