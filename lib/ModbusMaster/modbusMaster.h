@@ -70,6 +70,7 @@ class modbusMaster
     WORD bytes_read;
 
     WORD CRC16 (const uint8_t *nData, WORD wLength);
+    int8_t receiveSerialMessages(Stream &ser_local, int8_t state);
     int encodeRTUFrame(const uint8_t *data, uint8_t dlen, uint8_t *frame, uint8_t slave_addr, uint8_t function_code);
     int decodeRTUFrame(const uint8_t *frame, WORD flen, uint8_t *data, uint8_t *slave_addr, uint8_t *function_code);
 };
