@@ -119,27 +119,32 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
     int encode = encodeRTUFrame(data_buf, start_addr_len+num_regs_len, send_buf, slave_id, FUNC_READ_MULTIREG);
     int output = -1;
 
+    ctr = 0;
+    sa_recv = 0;
+    fcode = 0;
+    bytes_read = 0;
+
     if (encode == 0) {
         state = ST_WRIT;
         uint16_t send_buf_len = slave_id_len + fcode_len + start_addr_len + num_regs_len + crc_len;
         for(uint16_t i=0; i < send_buf_len; i++) {
             ser.write(send_buf[i]);
-            ser.flush();
-            Serial.print(send_buf[i], HEX);
-            Serial.print(" ");
+            // Serial.print(send_buf[i], HEX);
+            // Serial.print(" ");
         }
-        Serial.print("\n");
+        // Serial.print("\n");
         state = ST_IDLE;
+        ser.flush();
 
         delayMicroseconds(100);
         // Bytes available to read
         if ( ser.available() > 0 )
         {
             state = ST_RECV;
-            ctr = 0;
-            sa_recv = 0;
-            fcode = 0;
-            bytes_read = 0;
+            // ctr = 0;
+            // sa_recv = 0;
+            // fcode = 0;
+            // bytes_read = 0;
         } else {
             Serial.println("No packet received");
         }
@@ -159,10 +164,10 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
                 {
                     //Transmission has ended
                     for (int i = 0; i < ctr; i++) {
-                        Serial.print(recv_buf[i], HEX);
-                        Serial.print(" ");
+                        // Serial.print(recv_buf[i], HEX);
+                        // Serial.print(" ");
                     }
-                    Serial.println();
+                    // Serial.println();
                     state = ST_PROC;
                     bytes_read = ctr;
                 }
@@ -171,7 +176,7 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
 
         if ( state == ST_PROC )
         {
-            Serial.println("in ST_PROC");
+    //         Serial.println("in ST_PROC");
             // Process the request in the incoming message.
             int ret = decodeRTUFrame(recv_buf, bytes_read, data_buf, &sa_recv, &fcode);
 
@@ -187,16 +192,15 @@ int modbusMaster::readMultipleHR(uint8_t slave_id, uint16_t start_addr, uint16_t
                 }
                 else
                 {
-                    Serial.println(fcode, HEX);
                     if(fcode == FUNC_READ_MULTIREG) {
                         Serial.print("in fcode\n");
-                            uint16_t byte_count;
-                            byte_count = data_buf[1] | (data_buf[0] << 8);
-                            for(int i = 0; i < byte_count/2; i++) {
-                                data[i] = data_buf[i*2+3] | (data_buf[i*2+2] << 8);
-                            }
-                            if(byte_count == num_regs * 2);
-                                output = 0;
+                        uint16_t byte_count;
+                        byte_count = data_buf[0];
+                        for(int i = 0; i < byte_count/2; i++) {
+                            data[i] = data_buf[i*2+2] | (data_buf[i*2+1] << 8);
+                        }
+                        if(byte_count == num_regs * 2);
+                            output = 0;
                     }
                     state = ST_IDLE;
                 }
